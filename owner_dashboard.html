@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parking Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
+        .control-panel { background: #2d2d2d; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        
+        button.camera-btn { background: #10b981; } 
+        button.settings-btn { background: #6366f1; font-size: 18px; padding: 8px 12px; height: 50px; }
+        button.excel-btn { background: #22c55e; font-size: 14px; padding: 8px 16px; margin-left: 10px; }
+        button.clear-btn { background: #ef4444; font-size: 14px; padding: 8px 16px; margin-left: 10px; }
+        button.analysis-btn { background: #f59e0b; font-size: 14px; padding: 8px 16px; margin-left: 10px; }
+
+        .visualizer { position: relative; width: 1000px; height: 600px; background: #000; border: 2px solid #444; border-radius: 8px; overflow: hidden; margin: 0 auto 30px; }
+        #video-display, #drawing-canvas { position: absolute; top: 0; left: 0; width: 1000px; height: 600px; }
+        
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 350px; gap: 20px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .card { background: #2d2d2d; padding: 25px; border-radius: 8px; text-align: center; }
+        .card .value { font-size: 42px; font-weight: bold; }
+        .chart-container { background: #2d2d2d; padding: 20px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; background: #333; padding: 10px; border-radius: 6px; }
+        .search-input { background: #222; border: 1px solid #555; color: white; padding: 8px 12px; border-radius: 4px; width: 150px; }
+        .filter-btn { padding: 6px 12px; font-size: 13px; background: #444; color: #aaa; border: 1px solid #555; }
+        .filter-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+
+        .slot-monitoring-panel { background: #2d2d2d; padding: 20px; border-radius: 8px; margin-top: 20px; display: none; }
+        .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; margin-top: 15px; }
+        .slot-item { background: #333; padding: 15px; border-radius: 6px; text-align: center; border-left: 5px solid #666; position: relative; }
+        .timer { font-size: 11px; margin-top: 5px; display: block; color: #aaa; }
+        .fee-badge { background: #1f2937; color: #4ade80; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-top: 4px; display: inline-block; font-weight: bold; }
+
+        .overstay { animation: flash-red 1s infinite; border-left-color: #ff0000 !important; }
+        @keyframes flash-red { 0% { background-color: #333; } 50% { background-color: #7f1d1d; } 100% { background-color: #333; } }
+        .overstay-reserved { animation: flash-purple 1s infinite; border-left-color: #a855f7 !important; }
+        @keyframes flash-purple { 0% { background-color: #333; } 50% { background-color: #581c87; } 100% { background-color: #333; } }
+
+        .bg-free { border-left-color: #4ade80; color: #4ade80; }
+        .bg-filled { border-left-color: #f87171; color: #f87171; }
+        .bg-wrong { border-left-color: #facc15; color: #facc15; }
+        .bg-reserved-free { border-left-color: #3b82f6 !important; color: #3b82f6; } 
+        .bg-reserved-filled { border-left-color: #a855f7 !important; color: #a855f7; }
+
+        .c-green { color: #4ade80; } .c-red { color: #f87171; } .c-yellow { color: #facc15; } .c-blue { color: #60a5fa; }
+
+        .rate-wrapper { display: flex; flex-direction: column; gap: 5px; border-left: 1px solid #444; padding-left: 15px; height: 120px; justify-content: center; }
+        .rate-input { background: #333; border: 1px solid #555; padding: 10px; color: white; font-size: 16px; border-radius: 4px; width: 80px; text-align: center; cursor: ns-resize; }
+        .time-picker-wrapper { display: flex; align-items: center; gap: 15px; border-left: 1px solid #444; padding-left: 15px; }
+        .time-picker-label { color: #aaa; font-size: 14px; font-weight: bold; display: block; margin-bottom: 5px;}
+        .time-picker-container { display: flex; align-items: center; background: #222; border-radius: 8px; border: 1px solid #444; height: 120px; position: relative; overflow: hidden; width: 230px; }
+        .picker-column { flex: 1; height: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; -ms-overflow-style: none; text-align: center; position: relative; z-index: 2; }
+        .picker-column::-webkit-scrollbar { width: 0; height: 0; }
+        .picker-item { height: 40px; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #666; scroll-snap-align: center; transition: all 0.2s; }
+        .picker-item.selected { font-size: 28px; font-weight: bold; color: #fff; }
+        .time-separator { font-size: 28px; font-weight: bold; color: #fff; margin-top: -5px; z-index: 2;}
+        .picker-overlay { position: absolute; top: 50%; left: 5px; right: 5px; height: 40px; margin-top: -20px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; pointer-events: none; z-index: 1; }
+        .column-label { position: absolute; bottom: 5px; width: 33.33%; text-align: center; font-size: 9px; color: #888; text-transform: uppercase; pointer-events: none;}
+        
+        .history-panel { background: #2d2d2d; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        .history-table th { text-align: left; padding: 12px; border-bottom: 2px solid #444; color: #aaa; }
+        .history-table td { padding: 12px; border-bottom: 1px solid #333; }
+        .status-in { color: #4ade80; font-weight: bold; }
+        .status-out { color: #f87171; font-weight: bold; }
+        
+        /* NEW: Invoice Button Style */
+        .invoice-btn { background: #8b5cf6; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; }
+        .invoice-btn:hover { background: #7c3aed; }
+        .no-invoice { color: #666; font-style: italic; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚗 Smart Parking Analytics</h1>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button class="analysis-btn" onclick="window.open('/owner_bookings', '_blank')">📋 Check Bookings</button>
+                <div id="status">Status: Waiting</div>
+            </div>
+        </header>
+
+        <div class="control-panel">
+            <div id="upload-step" style="display:flex; gap:15px; align-items:center;">
+                <input type="file" id="videoInput" accept="video/*">
+                <button onclick="uploadVideo()">1. Upload Video</button>
+                <button class="camera-btn" onclick="useCamera()">Access Camera</button>
+            </div>
+            
+            <div class="time-picker-wrapper">
+                <div>
+                    <span class="time-picker-label">Overstay Alert:</span>
+                    <div class="time-picker-container">
+                        <div class="picker-overlay"></div>
+                        <div class="picker-column" id="hour-column"><div class="picker-item dummy"></div><div class="picker-item dummy-bottom"></div></div>
+                        <div class="time-separator">:</div>
+                        <div class="picker-column" id="minute-column"><div class="picker-item dummy"></div><div class="picker-item dummy-bottom"></div></div>
+                        <div class="time-separator">:</div>
+                        <div class="picker-column" id="second-column"><div class="picker-item dummy"></div><div class="picker-item dummy-bottom"></div></div>
+                        <div class="column-label" style="left:0;">HR</div><div class="column-label" style="left:33.33%;">MIN</div><div class="column-label" style="left:66.66%;">SEC</div>
+                    </div>
+                </div>
+                <button class="settings-btn" onclick="updateThreshold()">⏱️</button>
+                <button id="soundToggle" onclick="toggleSound()" style="background:#555;">🔊</button>
+            </div>
+
+            <div class="rate-wrapper">
+                <span class="time-picker-label">Hourly Rate ($):</span>
+                <div style="display: flex; gap: 5px;">
+                    <input type="number" id="hourlyRate" class="rate-input" value="5.00" step="0.50" title="Scroll to change">
+                    <button class="settings-btn" onclick="updateRate()" style="background: #10b981;">$</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel" id="draw-controls" style="display:none;">
+            <span id="instruction-text">Mark slots. <b>Right-click slot to Reserve (Blue).</b></span>
+            <button class="secondary" onclick="clearCanvas()">Clear Last</button>
+            <button onclick="startAnalysis()">2. Start Dashboard</button>
+        </div>
+
+        <div class="visualizer">
+            <img id="video-display">
+            <canvas id="drawing-canvas"></canvas>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="stats-grid">
+                <div class="card"><h3>Free</h3><div class="value c-green" id="val-free">0</div></div>
+                <div class="card"><h3>Filled</h3><div class="value c-red" id="val-filled">0</div></div>
+                <div class="card"><h3>Est. Revenue</h3><div class="value c-blue" id="val-revenue">$0.00</div></div>
+                <div class="card"><h3>Total</h3><div class="value" id="val-total">0</div></div>
+                <div class="card"><h3>Wrong</h3><div class="value c-yellow" id="val-wrong">0</div></div>
+            </div>
+            <div class="chart-container"><canvas id="parkingPieChart"></canvas></div>
+        </div>
+
+        <div class="slot-monitoring-panel" id="slot-panel">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>Live Slot Status & Fees</h2>
+                <div class="filter-bar">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search (e.g. 5)..." onkeyup="updateFilter()">
+                    <button class="filter-btn active" onclick="setFilter('ALL')" id="btn-ALL">All</button>
+                    <button class="filter-btn" onclick="setFilter('FREE')" id="btn-FREE">Free</button>
+                    <button class="filter-btn" onclick="setFilter('FILLED')" id="btn-FILLED">Filled</button>
+                    <button class="filter-btn" onclick="setFilter('OVERSTAY')" id="btn-OVERSTAY">Overstay</button>
+                    <button class="filter-btn" onclick="setFilter('RESERVED')" id="btn-RESERVED">Reserved</button>
+                </div>
+            </div>
+            <div class="slot-grid" id="individual-slots"></div>
+        </div>
+
+        <div class="history-panel" id="history-section" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Recent Entry/Exit History</h2>
+                <div>
+                    <button class="analysis-btn" onclick="window.open('analysis.html', '_blank')">📊 Daily Analysis</button>
+                    <button class="clear-btn" onclick="clearHistory()">🗑️ Delete All History</button>
+                    <button class="excel-btn" onclick="downloadExcel()">📥 Download Excel</button>
+                </div>
+            </div>
+            <table class="history-table">
+                <thead>
+                    <tr><th>ID</th><th>Slot</th><th>Entry Time</th><th>Exit Time</th><th>Duration</th><th>Fee ($)</th><th>Receipt</th></tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000", canvas = document.getElementById('drawing-canvas'), ctx = canvas.getContext('2d');
+        let currentPoints = [], allSlots = [], reservedIndices = [], parkingChart;
+        let isAnalyzing = false;
+        let currentFilter = 'ALL';
+        let searchText = '';
+        
+        let soundEnabled = true;
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let lastBeepTime = 0;
+        
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundToggle').innerText = soundEnabled ? "🔊" : "🔇";
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type, slotId = null) {
+            if (!soundEnabled || Date.now() - lastBeepTime < 4000) return; 
+            lastBeepTime = Date.now();
+
+            if (type === 'WRONG' && slotId) {
+                const message = `Someone parked wrong at slot number ${slotId}`;
+                const utterance = new SpeechSynthesisUtterance(message);
+                utterance.rate = 1.0; 
+                utterance.pitch = 1.0;
+                window.speechSynthesis.speak(utterance);
+            } else {
+                playBeep();
+            }
+        }
+
+        function playBeep() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); 
+            oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); 
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.2);
+        }
+
+        canvas.width = 1000; canvas.height = 600;
+
+        window.onload = function() {
+            initChart(); initTimePicker(); initRateScroll();
+            canvas.addEventListener('contextmenu', async (e) => {
+                e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+                if (isAnalyzing) {
+                    try {
+                        const res = await fetch(`${API_URL}/toggle_reserved`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ x: x, y: y }) });
+                        if((await res.json()).success) {
+                            const saved = await fetch(`${API_URL}/get_saved_slots`);
+                            reservedIndices = (await saved.json()).reserved;
+                        }
+                    } catch(err) {}
+                } else {
+                    for (let i = 0; i < allSlots.length; i++) {
+                        if (isPointInPolygon([x, y], allSlots[i])) {
+                            if (reservedIndices.includes(i)) reservedIndices = reservedIndices.filter(idx => idx !== i);
+                            else reservedIndices.push(i);
+                            draw(); break;
+                        }
+                    }
+                }
+            });
+        };
+
+        function updateFilter() { searchText = document.getElementById('searchInput').value.toLowerCase(); }
+        function setFilter(type) {
+            currentFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${type}`).classList.add('active');
+        }
+        function isPointInPolygon(point, vs) {
+            var x = point[0], y = point[1];
+            var inside = false;
+            for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                var xi = vs[i][0], yi = vs[i][1];
+                var xj = vs[j][0], yj = vs[j][1];
+                var intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function initRateScroll() {
+            document.getElementById('hourlyRate').addEventListener('wheel', function(e) {
+                e.preventDefault(); let val = parseFloat(this.value) || 0;
+                val = e.deltaY < 0 ? val + 0.5 : val - 0.5;
+                if (val < 0) val = 0; this.value = val.toFixed(2);
+            });
+        }
+
+        const ITEM_HEIGHT = 40;
+        function initTimePicker() {
+            populateColumn('hour-column', 99); populateColumn('minute-column', 59); populateColumn('second-column', 59);
+            document.getElementById('hour-column').scrollTop = 0; 
+            document.getElementById('minute-column').scrollTop = ITEM_HEIGHT * 3; 
+            document.getElementById('second-column').scrollTop = 0; 
+            ['hour-column', 'minute-column', 'second-column'].forEach(id => {
+                const col = document.getElementById(id); col.addEventListener('scroll', () => handleScroll(id)); handleScroll(id); 
+            });
+        }
+        function populateColumn(id, max) {
+            const col = document.getElementById(id), dummyBottom = col.querySelector('.dummy-bottom');
+            for (let i = 0; i <= max; i++) {
+                const item = document.createElement('div'); item.className = 'picker-item'; item.innerText = i.toString().padStart(2, '0');
+                col.insertBefore(item, dummyBottom);
+            }
+        }
+        function handleScroll(id) {
+            const col = document.getElementById(id), idx = Math.round(col.scrollTop / ITEM_HEIGHT);
+            col.querySelectorAll('.picker-item:not(.dummy):not(.dummy-bottom)').forEach(el => el.classList.remove('selected'));
+            const items = col.querySelectorAll('.picker-item:not(.dummy):not(.dummy-bottom)');
+            if (items[idx]) items[idx].classList.add('selected');
+        }
+
+        async function updateThreshold() {
+            const h = Math.round(document.getElementById('hour-column').scrollTop / ITEM_HEIGHT);
+            const m = Math.round(document.getElementById('minute-column').scrollTop / ITEM_HEIGHT);
+            const s = Math.round(document.getElementById('second-column').scrollTop / ITEM_HEIGHT);
+            const sec = (h*3600)+(m*60)+s;
+            if(sec===0) return alert("Time must be > 0");
+            await fetch(`${API_URL}/update_threshold`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({seconds:sec})});
+            alert(`Set to ${h}h ${m}m ${s}s`);
+        }
+
+        async function updateRate() {
+            const rate = parseFloat(document.getElementById('hourlyRate').value);
+            await fetch(`${API_URL}/update_rate`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({rate:rate})});
+            alert(`Rate set to $${rate}`);
+        }
+
+        function initChart() {
+            const chartCtx = document.getElementById('parkingPieChart').getContext('2d');
+            parkingChart = new Chart(chartCtx, {
+                type: 'pie',
+                data: { labels: ['Free', 'Filled', 'Wrong'], datasets: [{ data: [0,0,0], backgroundColor: ['#4ade80', '#f87171', '#facc15'], borderWidth: 0 }] },
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: 'white' } } } }
+            });
+        }
+
+        function formatDuration(seconds) {
+            if (seconds === 0) return "--";
+            const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
+            return `${h > 0 ? h+'h ' : ''}${m}m ${s}s`;
+        }
+
+        async function handleSourceReady(res) {
+            const data = await res.json();
+            document.getElementById('video-display').src = `${API_URL}/first_frame?t=${new Date().getTime()}`;
+            document.getElementById('upload-step').style.display = 'none';
+            document.getElementById('draw-controls').style.display = 'flex';
+            if (data.has_saved_slots) {
+                const saved = await fetch(`${API_URL}/get_saved_slots`);
+                const slotData = await saved.json();
+                allSlots = slotData.slots;
+                reservedIndices = slotData.reserved || [];
+                draw();
+            }
+        }
+
+        async function useCamera() { handleSourceReady(await fetch(`${API_URL}/use_camera`, {method:'POST'})); }
+        async function uploadVideo() {
+            const fd = new FormData(); fd.append("file", document.getElementById('videoInput').files[0]);
+            handleSourceReady(await fetch(`${API_URL}/upload`, {method:'POST', body:fd}));
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if(e.button === 2) return; 
+            const r = canvas.getBoundingClientRect();
+            currentPoints.push([Math.round((e.clientX - r.left)*(1000/r.width)), Math.round((e.clientY - r.top)*(600/r.height))]);
+            draw();
+            if (currentPoints.length === 4) { allSlots.push(currentPoints); currentPoints = []; draw(); }
+        });
+
+        function draw() {
+            ctx.clearRect(0,0,1000,600); ctx.lineWidth = 2;
+            allSlots.forEach((s, i) => { 
+                ctx.strokeStyle = reservedIndices.includes(i) ? '#3b82f6' : '#00ff00';
+                ctx.beginPath(); ctx.moveTo(s[0][0],s[0][1]); s.forEach(p=>ctx.lineTo(p[0],p[1])); ctx.closePath(); ctx.stroke(); 
+            });
+            ctx.fillStyle = 'red'; currentPoints.forEach(p => { ctx.beginPath(); ctx.arc(p[0],p[1],5,0,Math.PI*2); ctx.fill(); });
+        }
+        
+        function clearCanvas() { 
+            if (currentPoints.length > 0) currentPoints = []; 
+            else {
+                allSlots.pop();
+                const indexRemoved = allSlots.length;
+                reservedIndices = reservedIndices.filter(i => i !== indexRemoved);
+            }
+            draw(); 
+        }
+
+        async function startAnalysis() {
+            isAnalyzing = true;
+            await fetch(`${API_URL}/set_slots`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({slots:allSlots, reserved:reservedIndices}) });
+            document.getElementById('video-display').src = `${API_URL}/video_feed`;
+            canvas.style.display = 'none'; document.getElementById('draw-controls').style.display = 'none';
+            document.getElementById('slot-panel').style.display = 'block';
+            document.getElementById('history-section').style.display = 'block'; 
+            setInterval(updateStats, 1000);
+            setInterval(updateHistory, 2000); 
+        }
+
+        function downloadExcel() { window.location.href = `${API_URL}/download_excel`; }
+
+        async function clearHistory() {
+            if(!confirm("Are you sure you want to delete ALL parking history? This cannot be undone.")) return;
+            try {
+                const res = await fetch(`${API_URL}/clear_history`, {method: 'DELETE'});
+                const data = await res.json();
+                if(data.success) { alert("Database cleared successfully!"); updateHistory(); } else { alert("Failed to clear database."); }
+            } catch(e) { console.error(e); alert("Error connecting to server."); }
+        }
+
+        async function updateHistory() {
+            try {
+                const res = await fetch(`${API_URL}/history`);
+                const logs = await res.json();
+                const tbody = document.getElementById('history-body');
+                tbody.innerHTML = '';
+                logs.forEach(log => {
+                    const row = document.createElement('tr');
+                    const durationStr = log.duration_seconds ? formatDuration(log.duration_seconds) : "Active";
+                    const feeStr = log.final_fee ? `$${log.final_fee.toFixed(2)}` : "-";
+                    
+                    let receiptHtml = '<span class="no-invoice">-</span>';
+                    if (log.exit_time) {
+                        receiptHtml = `<a href="${API_URL}/download_invoice/${log.id}" target="_blank" class="invoice-btn">📄 Receipt</a>`;
+                    }
+
+                    row.innerHTML = `<td>${log.id}</td><td>Slot ${log.slot_id}</td><td>${log.entry_time.split(" ")[1]}</td><td>${log.exit_time ? log.exit_time.split(" ")[1] : "..."}</td><td>${durationStr}</td><td>${feeStr}</td><td>${receiptHtml}</td>`;
+                    tbody.appendChild(row);
+                });
+            } catch(e) { console.error("History error", e); }
+        }
+
+        async function updateStats() {
+            const res = await fetch(`${API_URL}/stats`), data = await res.json();
+            document.getElementById('val-total').innerText = data.total;
+            document.getElementById('val-free').innerText = data.free;
+            document.getElementById('val-filled').innerText = data.filled;
+            document.getElementById('val-wrong').innerText = data.wrong;
+            document.getElementById('val-revenue').innerText = `$${data.revenue.toFixed(2)}`;
+            parkingChart.data.datasets[0].data = [data.free, data.filled, data.wrong]; parkingChart.update();
+
+            const container = document.getElementById('individual-slots');
+            container.innerHTML = '';
+            
+            let wrongSlotId = null;
+            let overstayDetected = false;
+
+            data.detailed.forEach(slot => {
+                if (slot.status === 'WRONG') wrongSlotId = slot.id; 
+                if (slot.is_overstay) overstayDetected = true;
+
+                const name = `SLOT ${slot.id}`;
+                if (searchText && !name.toLowerCase().includes(searchText)) return; 
+                if (currentFilter !== 'ALL') {
+                    if (currentFilter === 'FREE' && slot.status !== 'FREE') return;
+                    if (currentFilter === 'FILLED' && slot.status === 'FREE') return;
+                    if (currentFilter === 'OVERSTAY' && !slot.is_overstay) return;
+                    if (currentFilter === 'RESERVED' && !slot.is_reserved) return;
+                }
+
+                const div = document.createElement('div');
+                let slotClass = `slot-item `;
+                if (slot.is_reserved) {
+                    if (slot.status === 'FREE') slotClass += 'bg-reserved-free';
+                    else {
+                        slotClass += 'bg-reserved-filled';
+                        if (slot.is_overstay) slotClass += ' overstay-reserved';
+                    }
+                } else {
+                    if (slot.status === 'FREE') slotClass += 'bg-free';
+                    else if (slot.status === 'FILLED') slotClass += 'bg-filled';
+                    else slotClass += 'bg-wrong';
+                    if (slot.is_overstay) slotClass += ' overstay';
+                }
+
+                const feeHtml = slot.status === 'FILLED' || slot.status === "WRONG" ? `<span class="fee-badge">$${slot.fee.toFixed(2)}</span>` : '';
+                const reservedLabel = slot.is_reserved ? '<br><span style="font-size:9px; color:#3b82f6;">(RESERVED)</span>' : '';
+                div.className = slotClass;
+                div.innerHTML = `<strong>SLOT ${slot.id}</strong>${reservedLabel}<br><small>${slot.status}</small><span class="timer">${formatDuration(slot.duration)}</span>${feeHtml}`;
+                container.appendChild(div);
+            });
+
+            if (wrongSlotId) {
+                playSound('WRONG', wrongSlotId);
+            } else if (overstayDetected) {
+                playSound('OVERSTAY');
+            }
+        }
+    </script>
+</body>
+</html>

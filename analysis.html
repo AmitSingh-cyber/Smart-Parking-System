@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Parking Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #1e1e1e; color: #fff; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { border-bottom: 1px solid #333; padding-bottom: 15px; }
+        
+        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: #2d2d2d; padding: 20px; border-radius: 8px; text-align: center; }
+        .kpi-title { font-size: 14px; color: #aaa; text-transform: uppercase; }
+        .kpi-value { font-size: 36px; font-weight: bold; margin-top: 10px; color: #4ade80; }
+        
+        .chart-section { background: #2d2d2d; padding: 20px; border-radius: 8px; }
+        .back-btn { background: #3b82f6; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">← Back to Live Dashboard</a>
+        <h1>📊 Daily Analysis Report (<span id="date-display">...</span>)</h1>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">Total Cars Today</div>
+                <div class="kpi-value" id="total-cars">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Total Revenue</div>
+                <div class="kpi-value" id="total-revenue">$0.00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Busiest Hour</div>
+                <div class="kpi-value" id="peak-hour" style="color: #f59e0b;">--</div>
+            </div>
+        </div>
+
+        <div class="chart-section">
+            <h3>Hourly Traffic Flow</h3>
+            <canvas id="trafficChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000";
+
+        async function loadData() {
+            try {
+                const res = await fetch(`${API_URL}/daily_stats`);
+                const data = await res.json();
+
+                document.getElementById('date-display').innerText = data.date;
+                document.getElementById('total-cars').innerText = data.total_cars;
+                document.getElementById('total-revenue').innerText = `$${data.total_revenue.toFixed(2)}`;
+
+                // Find Peak Hour
+                const maxTraffic = Math.max(...data.hourly_traffic);
+                const peakHourIndex = data.hourly_traffic.indexOf(maxTraffic);
+                document.getElementById('peak-hour').innerText = maxTraffic > 0 ? `${peakHourIndex}:00` : "--";
+
+                // Render Chart
+                const ctx = document.getElementById('trafficChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                        datasets: [{
+                            label: 'Cars Entered',
+                            data: data.hourly_traffic,
+                            backgroundColor: '#3b82f6',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#444' } },
+                            x: { grid: { display: false } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+
+            } catch (e) {
+                console.error("Error loading analysis", e);
+                alert("Could not load analysis data.");
+            }
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>

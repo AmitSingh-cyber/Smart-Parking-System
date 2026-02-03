@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Parking View</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .visualizer { position: relative; width: 1000px; height: 600px; background: #000; border: 2px solid #444; border-radius: 8px; overflow: hidden; margin: 0 auto 30px; }
+        #video-display { width: 100%; height: 100%; object-fit: contain; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .card { background: #2d2d2d; padding: 25px; border-radius: 8px; text-align: center; }
+        .card .value { font-size: 42px; font-weight: bold; }
+        .c-green { color: #4ade80; } .c-red { color: #f87171; } .c-yellow { color: #facc15; }
+        .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 15px; }
+        .slot-item { background: #333; padding: 15px; border-radius: 6px; text-align: center; border-left: 5px solid #666; position: relative; }
+        .bg-free { border-left-color: #4ade80; color: #4ade80; }
+        .bg-filled { border-left-color: #f87171; color: #f87171; }
+        .bg-wrong { border-left-color: #facc15; color: #facc15; }
+        .bg-reserved { border-left-color: #3b82f6; color: #3b82f6; }
+        .bg-my-booking { border-left-color: #8b5cf6 !important; color: #8b5cf6 !important; background: #2e1065 !important; }
+        .logout-btn { background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; }
+        .reserve-btn { background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 8px; width: 100%; }
+        .reserved-badge { font-size: 12px; color: #60a5fa; margin-top: 5px; display: block; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚗 Live Parking View</h1>
+            <a href="/" class="logout-btn">Logout</a>
+        </header>
+        <div class="visualizer"><img id="video-display" src="/video_feed"></div>
+        <div class="stats-grid">
+            <div class="card"><h3>Free Slots</h3><div class="value c-green" id="val-free">0</div></div>
+            <div class="card"><h3>Occupied</h3><div class="value c-red" id="val-filled">0</div></div>
+            <div class="card"><h3>Wrong Parking</h3><div class="value c-yellow" id="val-wrong">0</div></div>
+        </div>
+        <h2>Slot Status</h2>
+        <div class="slot-grid" id="individual-slots"></div>
+    </div>
+    <script>
+        const API_URL = "http://localhost:8000";
+        async function updateStats() {
+            try {
+                const res = await fetch(`${API_URL}/stats`);
+                const data = await res.json();
+                document.getElementById('val-free').innerText = data.free;
+                document.getElementById('val-filled').innerText = data.filled;
+                document.getElementById('val-wrong').innerText = data.wrong;
+                
+                const container = document.getElementById('individual-slots');
+                container.innerHTML = '';
+                
+                data.detailed.forEach(slot => {
+                    const div = document.createElement('div');
+                    let slotClass = `slot-item `;
+                    let statusText = slot.status;
+                    let actionHtml = '';
+                    
+                    // Check if this slot is reserved by ME (Local Storage check)
+                    const myBookingId = localStorage.getItem(`booking_${slot.id}`);
+
+                    if (slot.is_reserved) {
+                        if (myBookingId) {
+                            slotClass += 'bg-my-booking';
+                            statusText = "YOUR BOOKING";
+                            actionHtml = `<span class="reserved-badge">ID: ${myBookingId}</span>`;
+                        } else {
+                            slotClass += 'bg-reserved';
+                            statusText = "RESERVED";
+                        }
+                        
+                        if(slot.reserved_remaining > 0) {
+                            let m = Math.floor(slot.reserved_remaining / 60);
+                            let s = slot.reserved_remaining % 60;
+                            let timeStr = `${m}:${s.toString().padStart(2, '0')}`;
+                            actionHtml += `<span class="reserved-badge">Exp: ${timeStr}</span>`;
+                        }
+                    } else {
+                        // If slot was previously booked by me but now free (expired/used), clear storage
+                        if (myBookingId) localStorage.removeItem(`booking_${slot.id}`);
+                        
+                        if (slot.status === 'FREE') {
+                            slotClass += 'bg-free';
+                            actionHtml = `<button class="reserve-btn" onclick="location.href='/booking_form?slot=${slot.id}'">Reserve Now</button>`;
+                        } else if (slot.status === 'FILLED') {
+                            slotClass += 'bg-filled';
+                        } else {
+                            slotClass += 'bg-wrong';
+                        }
+                    }
+                    div.className = slotClass;
+                    div.innerHTML = `<strong>SLOT ${slot.id}</strong><br><small>${statusText}</small>${actionHtml}`;
+                    container.appendChild(div);
+                });
+            } catch(e) {}
+        }
+        setInterval(updateStats, 1000);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+

@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+opencv-python
+ultralytics
+shapely
+pandas
+openpyxl
+reportlab
+python-barcode

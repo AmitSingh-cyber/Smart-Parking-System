@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking Login</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: #1e1e1e; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 350px; text-align: center; }
+        h1 { margin-bottom: 30px; color: #3b82f6; }
+        .role-switch { display: flex; background: #333; border-radius: 6px; margin-bottom: 20px; overflow: hidden; }
+        .role-btn { flex: 1; padding: 10px; cursor: pointer; border: none; background: transparent; color: #aaa; transition: 0.3s; font-weight: bold; }
+        .role-btn.active { background: #3b82f6; color: white; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #444; background: #2d2d2d; color: white; box-sizing: border-box; }
+        button.login-btn { width: 100%; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        button.login-btn:hover { background: #059669; }
+        .hidden { display: none; }
+        .error { color: #ef4444; margin-bottom: 15px; font-size: 14px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>🅿️ Smart Parking</h1>
+        <div class="role-switch">
+            <button class="role-btn active" onclick="setRole('owner')">Owner</button>
+            <button class="role-btn" onclick="setRole('user')">User</button>
+        </div>
+
+        <div id="error-msg" class="error">Invalid Credentials</div>
+
+        <div id="owner-form">
+            <input type="text" id="owner-id" placeholder="Owner ID (admin)">
+            <input type="password" id="owner-pass" placeholder="Password (admin123)">
+        </div>
+
+        <div id="user-form" class="hidden">
+            <input type="text" id="user-name" placeholder="Your Name">
+            <input type="text" id="user-vehicle" placeholder="Vehicle Number">
+        </div>
+
+        <button class="login-btn" onclick="login()">Login</button>
+    </div>
+
+    <script>
+        let currentRole = 'owner';
+
+        function setRole(role) {
+            currentRole = role;
+            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (role === 'owner') {
+                document.getElementById('owner-form').classList.remove('hidden');
+                document.getElementById('user-form').classList.add('hidden');
+            } else {
+                document.getElementById('owner-form').classList.add('hidden');
+                document.getElementById('user-form').classList.remove('hidden');
+            }
+        }
+
+        async function login() {
+            const errorDiv = document.getElementById('error-msg');
+            errorDiv.style.display = 'none';
+
+            let payload = { role: currentRole };
+
+            if (currentRole === 'owner') {
+                payload.username = document.getElementById('owner-id').value;
+                payload.password = document.getElementById('owner-pass').value;
+            } else {
+                payload.name = document.getElementById('user-name').value;
+                payload.vehicle = document.getElementById('user-vehicle').value;
+                if (!payload.name || !payload.vehicle) {
+                    errorDiv.innerText = "Please fill all fields";
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+
+            try {
+                const res = await fetch('/login_attempt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    errorDiv.innerText = data.message;
+                    errorDiv.style.display = 'block';
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Connection Error");
+            }
+        }
+    </script>
+</body>
+</html>

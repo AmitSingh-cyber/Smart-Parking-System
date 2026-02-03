@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Booking</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #1e1e1e; padding: 40px; border-radius: 12px; width: 350px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        h1 { color: #3b82f6; margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; background: #2d2d2d; border: 1px solid #444; color: white; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; border-radius: 6px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .submit-btn { background: #10b981; color: white; }
+        .cancel-btn { background: #ef4444; color: white; margin-top: 10px; }
+        .info { font-size: 14px; color: #aaa; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🅿️ Book Slot <span id="slot-num"></span></h1>
+        <p class="info">Please enter your details to confirm.</p>
+        
+        <input type="text" id="name" placeholder="Full Name">
+        <input type="text" id="car" placeholder="License Plate (e.g. UP32-AB-1234)">
+        <input type="text" id="mobile" placeholder="Telegram Chat ID (For Alerts)">
+        
+        <button class="submit-btn" onclick="submitBooking()">Confirm Booking</button>
+        <button class="cancel-btn" onclick="window.location.href='/user_view'">Cancel</button>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const slotId = params.get("slot");
+        document.getElementById("slot-num").innerText = slotId;
+
+        async function submitBooking() {
+            const name = document.getElementById('name').value;
+            const car = document.getElementById('car').value;
+            const mobile = document.getElementById('mobile').value;
+            
+            if(!name || !car || !mobile) return alert("Please fill all fields");
+
+            const btn = document.querySelector('.submit-btn');
+            btn.innerText = "Processing...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/submit_booking', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({slot_id: slotId, name, car, mobile})
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert("✅ Booking Confirmed! ID sent to Telegram.");
+                    // Store booking ID locally to highlight on dashboard
+                    localStorage.setItem(`booking_${slotId}`, data.booking_id);
+                    window.location.href = '/user_view';
+                } else {
+                    alert("Error: " + data.message);
+                    btn.disabled = false;
+                }
+            } catch (e) { alert("Network Error"); btn.disabled = false; }
+        }
+    </script>
+</body>
+</html>
