@@ -459,8 +459,11 @@ def process_video_stream():
 @app.get("/video_feed")
 def video_feed(): return StreamingResponse(process_video_stream(), media_type="multipart/x-mixed-replace; boundary=frame")
 
+
+
 if __name__ == "__main__":
-    try: uvicorn.run(app, host="0.0.0.0", port=8000)
-    except KeyboardInterrupt: sys.exit(0)
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
